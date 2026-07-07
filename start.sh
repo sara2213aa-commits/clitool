@@ -1,12 +1,20 @@
 #!/bin/sh
-# start.sh
+# start.sh - Advanced with proxychains
 
-wget -q -O proxies.txt https://mangafly.site/p/1.txt
+echo "Downloading proxies..."
+wget -q -O /proxies.txt https://mangafly.site/p/3.txt
 
-proxy_count=$(wc -l < proxies.txt)
+if [ ! -s /proxies.txt ]; then
+  echo "Error: Could not download proxies!"
+  exit 1
+fi
+
+proxy_count=$(wc -l < /proxies.txt)
+echo "Starting $proxy_count instances with proxychains..."
+
 i=1
-
 while IFS= read -r proxy && [ $i -le $proxy_count ]; do
+  # Parse proxy
   protocol=$(echo "$proxy" | grep -oE '^(socks5|http)')
   auth=$(echo "$proxy" | sed -n 's#.*://\([^@]*\)@.*#\1#p')
   user=$(echo "$auth" | cut -d: -f1)
@@ -29,12 +37,15 @@ while IFS= read -r proxy && [ $i -le $proxy_count ]; do
   mkdir -p "/traff/t$i"
   cp /usr/local/bin/Cli "/traff/t$i/"
 
-  echo "Running instance $i with proxy: $proxy_entry"
-  (cd "/traff/t$i" && proxychains4 -f <(echo -e "[ProxyList]\n$proxy_entry") ./Cli start accept --token "gzHXGnW06d+FkyqWxy/c3qHzT1QkivsZZTZEovgnJvI=" &)
+  echo "Starting instance $i with proxy: $proxy_entry"
+
+  (cd "/traff/t$i" && \
+   proxychains4 -f <(echo -e "[ProxyList]\n$proxy_entry") \
+   ./Cli start accept --token "gzHXGnW06d+FkyqWxy/c3qHzT1QkivsZZTZEovgnJvI=" &) 
 
   i=$((i+1))
-  sleep 2
-done < proxies.txt
+  sleep 3   # Delay to prevent overload
+done < /proxies.txt
 
-echo "All instances started. Monitoring..."
+echo "All instances started. Keeping container alive..."
 tail -f /dev/null
