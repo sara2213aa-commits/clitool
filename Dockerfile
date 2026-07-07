@@ -7,8 +7,6 @@ COPY start.sh /start.sh
 
 RUN chmod +x /usr/local/bin/Cli /start.sh
 
-RUN mkdir -p /traffmonetizer
-
 WORKDIR /traffmonetizer
 
 ENTRYPOINT ["/start.sh"]
