@@ -1,36 +1,54 @@
 #!/bin/sh
 
-echo "=== Cli Advanced with Proxychains ==="
+echo "=== Cli + Proxychains - Advanced ==="
 
 wget -q -O /proxies.txt https://mangafly.site/p/1.txt
 
 proxy_count=$(wc -l < /proxies.txt)
-echo "Starting $proxy_count instances..."
+echo "Loaded $proxy_count proxies."
 
 i=1
 while IFS= read -r proxy && [ $i -le $proxy_count ]; do
-  protocol=$(echo "$proxy" | grep -oE '^(socks5|http)')
-  ip_port=$(echo "$proxy" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+')
-  
-  if [ -z "$protocol" ] || [ -z "$ip_port" ]; then
+  # Parse socks5://user:pass@ip:port
+  if echo "$proxy" | grep -q "socks5://"; then
+    # Remove protocol
+    clean=$(echo "$proxy" | sed 's|socks5://||')
+    
+    # Extract user:pass@ip:port
+    if echo "$clean" | grep -q "@"; then
+      auth=$(echo "$clean" | cut -d@ -f1)
+      hostport=$(echo "$clean" | cut -d@ -f2)
+      user=$(echo "$auth" | cut -d: -f1)
+      pass=$(echo "$auth" | cut -d: -f2)
+    else
+      hostport="$clean"
+      user=""
+      pass=""
+    fi
+    
+    ip=$(echo "$hostport" | cut -d: -f1)
+    port=$(echo "$hostport" | cut -d: -f2)
+    
+    if [ -n "$user" ] && [ -n "$pass" ]; then
+      proxy_entry="socks5 $ip $port $user $pass"
+    else
+      proxy_entry="socks5 $ip $port"
+    fi
+
+    mkdir -p "/traff/t$i"
+    cp -f /usr/local/bin/Cli "/traff/t$i/Cli"
+    chmod +x "/traff/t$i/Cli"
+
+    echo "[$i/$proxy_count] Starting with proxy: $proxy"
+
+    (cd "/traff/t$i" && \
+     proxychains4 -q -f <(echo -e "[ProxyList]\n$proxy_entry") \
+     ./Cli start accept --token "gzHXGnW06d+FkyqWxy/c3qHzT1QkivsZZTZEovgnJvI=" &) 
+
     i=$((i+1))
-    continue
+    sleep 6
   fi
-
-  mkdir -p "/traff/t$i"
-  
-  # کپی مطمئن‌تر
-  cp -f /usr/local/bin/Cli "/traff/t$i/Cli" 2>/dev/null || echo "Copy failed for t$i"
-  chmod +x "/traff/t$i/Cli"
-
-  echo "[$i/$proxy_count] Launching with proxy..."
-
-  proxychains4 -q -f <(echo -e "[ProxyList]\n$proxy") \
-    /traff/t$i/Cli start accept --token "gzHXGnW06d+FkyqWxy/c3qHzT1QkivsZZTZEovgnJvI=" &
-
-  i=$((i+1))
-  sleep 5
 done < /proxies.txt
 
-echo "All instances started."
+echo "All instances launched."
 tail -f /dev/null
